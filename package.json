@@ -1,0 +1,14 @@
+{
+  "name": "lets-chat",
+  "version": "1.0.0",
+  "description": "Chat application using socket communication",
+  "main": "index.js",
+  "type": "module",
+  "author": "anshad hassan",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.1",
+    "uuid": "^11.0.3",
+    "ws": "^8.18.0"
+  }
+}
