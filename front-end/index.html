@@ -1,17 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>One-to-One Chat</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    #messages { list-style: none; padding: 0; }
+    #messages li { padding: 10px; margin: 5px 0; }
+    .sent { background-color: #d0f7d9; text-align: right; }
+    .received { background-color: #f7d0d0; }
+    #input-container { position: fixed; bottom: 0; width: 100%; background-color: #fff; padding: 10px; }
+  </style>
 </head>
 <body>
-    <h1>One-to-One Chat App</h1>
-    <p id="client-id">Your ID: Not Connected</p>
-    <ul id="messages"></ul>
-    <input id="targetId" type="text" placeholder="Enter target ID">
-    <input id="messageInput" type="text" placeholder="Type your message">
-    <button id="sendButton">Send</button>
-    <script src="/script.js"></script>
+  <div>
+    <input id="username" type="text" placeholder="Enter your username" />
+    <button id="setUsernameBtn">Set Username</button>
+  </div>
+  
+  <ul id="messages"></ul>
+  <div id="input-container">
+    <input id="toUsername" type="text" placeholder="Recipient Username" />
+    <input id="message" type="text" placeholder="Type a message..." />
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const setUsernameBtn = document.getElementById('setUsernameBtn');
+    const usernameInput = document.getElementById('username');
+    const sendButton = document.getElementById('sendBtn');
+    const toUsernameInput = document.getElementById('toUsername');
+    const messageInput = document.getElementById('message');
+    const messages = document.getElementById('messages');
+
+    let username = '';
+
+    // Set username on button click
+    setUsernameBtn.addEventListener('click', () => {
+      username = usernameInput.value;
+      if (username) {
+        socket.emit('setUsername', username); // Send username to server
+      }
+    });
+
+    // Listen for user connection confirmation
+    socket.on('userConnected', (msg) => {
+      alert(msg);
+    });
+
+    // Listen for incoming private messages
+    socket.on('privateMessage', (data) => {
+      const li = document.createElement('li');
+      li.classList.add('received');
+      li.textContent = `Private message from ${data.from}: ${data.message}`;
+      messages.appendChild(li);
+      messages.scrollTop = messages.scrollHeight; // Scroll to bottom on new message
+    });
+
+    // Listen for error messages
+    socket.on('error', (errorMessage) => {
+      alert(errorMessage);
+    });
+
+    // Send private message
+    sendButton.addEventListener('click', () => {
+      const recipient = toUsernameInput.value;
+      const msg = messageInput.value;
+      if (recipient && msg) {
+        socket.emit('privateMessage', { toUsername: recipient, message: msg }); // Send private message
+        
+        // Display the sent message
+        const li = document.createElement('li');
+        li.classList.add('sent');
+        li.textContent = `You: ${msg}`;
+        messages.appendChild(li);
+
+        // Clear input field
+        messageInput.value = '';
+        messages.scrollTop = messages.scrollHeight; // Scroll to bottom on new message
+      }
+    });
+
+    // Optionally, handle pressing "Enter" to send a message
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendButton.click();
+      }
+    });
+  </script>
 </body>
 </html>

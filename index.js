@@ -1,50 +1,65 @@
 import express from 'express';
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
+import http from 'http';
+import { Server } from 'socket.io';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Setup __dirname for ES Module (since __dirname is not available in ESM)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const server = http.createServer(app);
+const io = new Server(server);
 
-// Store clients with unique IDs
-const clients = new Map();
+// Store connected users and their IDs
+const users = {};
 
-wss.on('connection', (ws) => {
-    // Generate a unique client ID
-    const clientId = uuidv4();
-    clients.set(clientId, ws);
+app.use(express.static(path.join(__dirname, 'front-end')));
 
-    // Send the client their unique ID
-    ws.send(JSON.stringify({ type: 'id', id: clientId }));
-
-    // Handle messages from clients
-    ws.on('message', (message) => {
-        const data = JSON.parse(message);
-
-        // Check for a direct message request
-        if (data.type === 'direct_message') {
-            const targetClient = clients.get(data.targetId);
-            if (targetClient) {
-                targetClient.send(JSON.stringify({
-                    type: 'message',
-                    from: clientId,
-                    message: data.message,
-                }));
-            } else {
-                ws.send(JSON.stringify({ error: 'User not found.' }));
-            }
-        }
-    });
-
-    ws.on('close', () => {
-        clients.delete(clientId);
-    });
+// Serve the HTML file
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'front-end', 'index.html'));
 });
 
-app.use(express.static('front-end'));
+// Handle new connections and assign unique ID
+io.on('connection', (socket) => {
+  console.log('a user connected: ' + socket.id);
+  
+  // Listen for new user login (with a username)
+  socket.on('setUsername', (username) => {
+    users[socket.id] = username;  // Assign username to socket ID
+    console.log(`${username} has connected`);
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    // Notify the user with their username
+    socket.emit('userConnected', `You are connected as ${username}`);
+  });
+
+  // Handle private messages
+  socket.on('privateMessage', (data) => {
+    const { toUsername, message } = data;
+    
+    // Find the socket ID of the recipient
+    const recipientSocketId = Object.keys(users).find(key => users[key] === toUsername);
+    
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('privateMessage', {
+        from: users[socket.id],
+        message
+      });
+    } else {
+      socket.emit('error', 'User not found!');
+    }
+  });
+
+  // Handle disconnect
+  socket.on('disconnect', () => {
+    console.log(`${users[socket.id]} disconnected`);
+    delete users[socket.id];  // Remove user from list on disconnect
+  });
+});
+
+// Start the server
+server.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
 });
